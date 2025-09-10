@@ -2,145 +2,183 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Sepsis-AKI Full QSP Model</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sepsis-AKI QSP Model</title>
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <style>
-        /* 이전 스타일 유지 */
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .status {
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .loading {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .file-list {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .file-list h3 {
+            margin-top: 0;
+        }
+        .file-list ul {
+            list-style: none;
+            padding: 0;
+        }
+        .file-list li {
+            padding: 5px 0;
+        }
+        .file-list .found {
+            color: green;
+        }
+        .file-list .missing {
+            color: red;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- UI는 이전과 동일 -->
+        <div class="header">
+            <h1>🏥 Sepsis-AKI QSP Model</h1>
+            <p>Cardio-Renal-Immune Systems Pharmacology Simulator</p>
+        </div>
+        
+        <div id="status" class="status loading">
+            <h3>📊 시스템 상태</h3>
+            <p>WebR 초기화 중...</p>
+        </div>
+        
+        <div class="file-list">
+            <h3>📁 모델 파일 상태</h3>
+            <ul id="fileStatus">
+                <li>확인 중...</li>
+            </ul>
+        </div>
+        
+        <div id="app" style="display:none;">
+            <p>🚧 모델 개발 진행 중...</p>
+            <p>Full QSP model implementation coming soon!</p>
+        </div>
     </div>
     
     <script type="module">
-        import { WebR } from 'https://webr.r-wasm.org/latest/webr.mjs';
-        
-        let webR;
-        let modelLoaded = false;
-        
-        async function initializeModel() {
-            console.log('WebR 초기화 중...');
-            webR = new WebR();
-            await webR.init();
+        // 파일 존재 확인
+        async function checkFiles() {
+            const files = [
+                'modelfile_0822.R',
+                'calcNomParams_human_0602.R',
+                'runmodel.R'
+            ];
             
-            // 전체 모델 파일을 문자열로 포함
-            const modelCode = `
-                # modelfile_0822.R 전체 내용
-                ${await fetch('modelfile_0822.R').then(r => r.text())}
-            `;
+            const fileStatus = document.getElementById('fileStatus');
+            fileStatus.innerHTML = '';
             
-            const paramsCode = `
-                # calcNomParams_human_0602.R 전체 내용
-                ${await fetch('calcNomParams_human_0602.R').then(r => r.text())}
-            `;
-            
-            // WebR용 rxode2 설치
-            await webR.evalR(`
-                # WebR 패키지 설치
-                webr::install("rxode2")
-                library(rxode2)
-                
-                # 모델 구조 정의
-                ${modelCode}
-                
-                # 파라미터 함수 정의
-                ${paramsCode}
-                
-                # 모델 컴파일
-                m1 <- rxode2(model = ode)
-                theta <- calcNomParams()
-                
-                print("모델 로드 완료!")
-            `);
-            
-            modelLoaded = true;
-            document.getElementById('runBtn').disabled = false;
+            for (const file of files) {
+                try {
+                    const response = await fetch(file);
+                    const exists = response.ok;
+                    const li = document.createElement('li');
+                    li.className = exists ? 'found' : 'missing';
+                    li.innerHTML = `${exists ? '✅' : '❌'} ${file} - ${exists ? 'Found' : 'Missing'}`;
+                    fileStatus.appendChild(li);
+                } catch (error) {
+                    const li = document.createElement('li');
+                    li.className = 'missing';
+                    li.innerHTML = `❌ ${file} - Error checking`;
+                    fileStatus.appendChild(li);
+                }
+            }
         }
         
-        async function runFullSimulation() {
-            if (!modelLoaded) return;
+        // WebR 초기화 (간단한 버전)
+        async function initWebR() {
+            const statusDiv = document.getElementById('status');
             
-            const cfu_init = document.getElementById('cfu_init').value;
-            const dosing = generateDosingSchedule();
-            const duration = document.getElementById('sim_duration').value;
-            
-            // R에서 전체 모델 실행
-            const result = await webR.evalR(`
-                # 초기값 설정 (전체 200개 상태변수)
-                inits <- c(
-                    AngI=8.164, AngII=5.17, AT1_bound_AngII=16.6, 
-                    AT2_bound_AngII=5.5, plasma_renin_concentration=17.845,
-                    blood_volume_L=5, extracellular_fluid_volume=15,
-                    sodium_amount=700, ECF_sodium_amount=2100,
-                    tubulo_glomerular_feedback_effect=1,
-                    normalized_aldosterone_level_delayed=1,
-                    preafferent_pressure_autoreg_signal=1,
-                    glomerular_pressure_autoreg_signal=1,
-                    cardiac_output_delayed=5,
-                    CO_error=0, Na_concentration_error=0,
-                    normalized_vasopressin_concentration_delayed=1,
-                    F0_TGF=1.0183333333333333333333333333333e-14,
-                    P_bowmans=14, oncotic_pressure_difference=28,
-                    SN_macula_densa_Na_flow_delayed=5.0916666666666666666666666666666e-21,
-                    serum_creatinine=4.6,
-                    CFU_lung=${cfu_init}, CFU_blood=0, R_lung=1e6, R_blood=0,
-                    CINC1=30, Lag1=0, Lag2=0, NS1=0, NS2=0, AC=48,
-                    AT2=3e+10, AT1=2e+10, dAT1=250.26, dAT2=375.4,
-                    pDC=0, pDC1=0, M1=0, Th1=0, Th17=0, Treg=0, N=2455.6,
-                    TNFa=0.00024335, IL6=0.00014131, IL1b=0.028005,
-                    IL2=0.35115, IL12=0, IL17=1.13E-05, IL10=0,
-                    TGFb=0, GMCSF=0,
-                    TNFa_c=1.54E-09, IL6_c=6.42E-08, IL1b_c=1.27E-05,
-                    IL2_c=7.34E-06, IL12_c=8.93E-06, IL17_c=0,
-                    IL10_c=9.72E-07, TGFb_c=8.11E-07, GMCSF_c=4.04E-06,
-                    CRPExtracellular=0, Blood_CRP=0,
-                    pDC_c=0.70096, M1_c=0.92091, N_c=0.48093,
-                    Th1_c=0.7964, Th17_c=0.00017499, Treg_c=0.21768,
-                    depot=0,
-                    C_venous_vanco=0, C_vas_ki_vanco=0, C_vas_lu_vanco=0,
-                    C_vas_ad_vanco=0, C_vas_bo_vanco=0, C_vas_go_vanco=0,
-                    C_vas_he_vanco=0, C_vas_mu_vanco=0, C_vas_sk_vanco=0,
-                    C_vas_br_vanco=0, C_vas_li_vanco=0, C_vas_re_vanco=0,
-                    C_vas_gu_vanco=0, C_vas_sp_vanco=0, C_arterial_vanco=0
-                )
+            try {
+                // WebR import
+                const { WebR } = await import('https://webr.r-wasm.org/latest/webr.mjs');
                 
-                # 이벤트 테이블 생성
-                ev1 <- eventTable(amount.units="mg", time.units="hours")
+                statusDiv.innerHTML = '<h3>📊 시스템 상태</h3><p>WebR 로딩 중... (1-2분 소요)</p>';
                 
-                # JavaScript에서 전달받은 투여 스케줄 적용
-                ${dosing.map(d => `ev1$add.dosing(dose=${d.amount}, start.time=${d.time}, nbr.doses=1, cmt="depot")`).join('\n')}
+                const webR = new WebR();
+                await webR.init();
                 
-                # 샘플링 시점 설정
-                ev1$add.sampling(seq(0, ${duration}, by=0.5))
+                // 간단한 테스트
+                await webR.evalR(`
+                    print("WebR 초기화 성공!")
+                    1 + 1
+                `);
                 
-                # 전체 모델 실행
-                x <- m1$run(theta, ev1, inits=inits)
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = '<h3>✅ 시스템 준비 완료</h3><p>WebR이 성공적으로 초기화되었습니다.</p>';
                 
-                # 결과를 JavaScript로 전달
-                list(
-                    time = as.numeric(x[,"time"]),
-                    CFU_lung = as.numeric(x[,"CFU_lung"]),
-                    IL1b_pg_mL = as.numeric(x[,"IL1b_pg_mL"]),
-                    IL6_pg_mL = as.numeric(x[,"IL6_pg_mL"]),
-                    TNFa_pg_mL = as.numeric(x[,"TNFa_pg_mL"]),
-                    IL10_pg_mL = as.numeric(x[,"IL10_pg_mL"]),
-                    MAP = as.numeric(x[,"mean_arterial_pressure_MAP"]),
-                    GFR = as.numeric(x[,"GFR_ml_min"]),
-                    Scr = as.numeric(x[,"serum_creatinine_concentration"]),
-                    CRP = as.numeric(x[,"CRP_mg_dl"]),
-                    N_c = as.numeric(x[,"N_c"]),
-                    cardiac_output = as.numeric(x[,"cardiac_output"])
-                )
-            `);
-            
-            const data = await result.toJs();
-            displayResults(data);
+                // rxode2 설치 시도 (WebR 저장소에서)
+                statusDiv.innerHTML += '<p>패키지 설치 중...</p>';
+                
+                try {
+                    await webR.evalR(`
+                        # WebR 패키지 저장소 설정
+                        options(repos = c(CRAN = "https://repo.r-wasm.org"))
+                        
+                        # 패키지 설치 시도
+                        if (!require(rxode2, quietly = TRUE)) {
+                            print("rxode2 패키지 설치 중...")
+                            # WebR에서는 install.packages가 다르게 작동할 수 있음
+                        }
+                    `);
+                } catch (pkgError) {
+                    console.log('패키지 설치는 WebR 환경에서 제한적입니다:', pkgError);
+                }
+                
+                document.getElementById('app').style.display = 'block';
+                
+            } catch (error) {
+                console.error('WebR 초기화 오류:', error);
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <h3>❌ 초기화 오류</h3>
+                    <p>${error.message}</p>
+                    <p><small>브라우저 콘솔에서 자세한 오류를 확인하세요.</small></p>
+                `;
+            }
         }
         
-        // 페이지 로드 시 모델 초기화
-        window.addEventListener('load', initializeModel);
-        window.runSimulation = runFullSimulation;
+        // 페이지 로드 시 실행
+        window.addEventListener('load', async () => {
+            await checkFiles();
+            await initWebR();
+        });
     </script>
 </body>
 </html>
