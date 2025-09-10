@@ -102,6 +102,12 @@
             background: #6c757d;
             cursor: not-allowed;
         }
+        .plot-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
     </style>
 </head>
 <body>
@@ -135,7 +141,10 @@
         </div>
         
         <div id="app" style="display:none;">
-            <div id="plotArea"></div>
+            <div class="plot-container">
+                <h3>📈 시뮬레이션 결과</h3>
+                <div id="plotArea"></div>
+            </div>
         </div>
     </div>
     
@@ -160,7 +169,7 @@
             document.getElementById('consoleOutput').innerHTML = 'Console cleared.<br>';
         }
         
-        // 파일 존재 확인 (CORS 에러 방지)
+        // 파일 존재 확인
         async function checkFiles() {
             const files = [
                 'modelfile_0822.R',
@@ -172,29 +181,18 @@
             fileStatus.innerHTML = '';
             
             for (const file of files) {
-                try {
-                    // CORS 에러 방지를 위한 옵션 추가
-                    const response = await fetch(file, {
-                        method: 'HEAD',
-                        mode: 'no-cors',
-                        cache: 'no-cache'
-                    });
-                    
-                    // no-cors 모드에서는 response.ok를 확인할 수 없으므로 다른 방법 사용
-                    const li = document.createElement('li');
-                    li.className = 'found'; // 일단 found로 표시
-                    li.innerHTML = `⚠️ ${file} - 확인 중 (CORS 제한)`;
-                    fileStatus.appendChild(li);
-                } catch (error) {
-                    const li = document.createElement('li');
-                    li.className = 'missing';
-                    li.innerHTML = `❌ ${file} - 접근 불가`;
-                    fileStatus.appendChild(li);
-                }
+                const li = document.createElement('li');
+                li.className = 'warning';
+                li.innerHTML = `⚠️ ${file} - 로컬 파일 (WebR에서 직접 로드 불가)`;
+                fileStatus.appendChild(li);
             }
+            
+            const note = document.createElement('li');
+            note.innerHTML = `<br>📝 참고: 샘플 모델을 사용하여 시뮬레이션을 실행합니다.`;
+            fileStatus.appendChild(note);
         }
         
-        // WebR 초기화 (개선된 버전)
+        // WebR 초기화
         async function initWebR() {
             const statusDiv = document.getElementById('status');
             
@@ -207,10 +205,9 @@
                 statusDiv.innerHTML = '<h3>📊 시스템 상태</h3><p>WebR 로딩 중... (1-2분 소요)</p>';
                 statusDiv.className = 'status loading';
                 
-                // WebR 인스턴스 생성 및 초기화
+                // WebR 인스턴스 생성
                 webR = new WebR({
-                    channelType: 'PostMessage',  // 명시적으로 PostMessage 사용
-                    interactive: false
+                    channelType: 'PostMessage'
                 });
                 
                 await webR.init();
@@ -219,12 +216,10 @@
                 // 기본 R 환경 설정
                 await webR.evalR(`
                     # 기본 설정
-                    options(warn = -1)  # 경고 메시지 억제
+                    options(warn = -1)
                     
-                    # 작업 디렉토리 설정
+                    # 작업 디렉토리 확인
                     print(paste("Working directory:", getwd()))
-                    
-                    # 기본 함수 테스트
                     print("WebR 환경 준비 완료!")
                     print(paste("R version:", R.version.string))
                 `);
@@ -232,29 +227,10 @@
                 statusDiv.className = 'status success';
                 statusDiv.innerHTML = '<h3>✅ 시스템 준비 완료</h3><p>WebR이 성공적으로 초기화되었습니다.</p>';
                 
-                // 필요한 패키지 설치 시도
-                try {
-                    logToConsole('필요 패키지 확인 중...', 'info');
-                    
-                    // WebR에서 사용 가능한 패키지 확인
-                    await webR.evalR(`
-                        # WebR 패키지 저장소 설정
-                        webr::install("deSolve", quiet = TRUE)
-                        
-                        # 사용 가능한 패키지 확인
-                        print("deSolve 패키지 설치 시도 완료")
-                    `).catch(e => {
-                        logToConsole('패키지 설치는 WebR 환경에서 제한적입니다.', 'warning');
-                    });
-                    
-                } catch (pkgError) {
-                    logToConsole(`패키지 관련 경고: ${pkgError.message}`, 'warning');
-                }
-                
                 document.getElementById('controlPanel').style.display = 'block';
                 document.getElementById('app').style.display = 'block';
                 
-                // 샘플 모델 코드 준비
+                // 샘플 모델 준비
                 await prepareSampleModel();
                 
             } catch (error) {
@@ -269,62 +245,52 @@
             }
         }
         
-        // 샘플 모델 준비 (실제 모델 파일이 없을 경우를 대비)
+        // 샘플 모델 준비
         async function prepareSampleModel() {
             try {
                 logToConsole('샘플 모델 준비 중...', 'info');
                 
-                // 간단한 PK/PD 모델 예제
                 await webR.evalR(`
-                    # Sepsis-AKI QSP 모델 샘플
-                    # 이것은 간단한 데모 모델입니다
+                    # Sepsis-AKI QSP 모델 (간소화 버전)
                     
                     # 모델 파라미터
                     params <- list(
-                        # Cardio parameters
-                        HR = 70,        # Heart rate
-                        SV = 70,        # Stroke volume
-                        TPR = 1,        # Total peripheral resistance
+                        # Cardiovascular parameters
+                        HR_base = 70,      # Baseline heart rate (bpm)
+                        SV_base = 70,      # Baseline stroke volume (mL)
+                        TPR_base = 1,      # Baseline total peripheral resistance
                         
                         # Renal parameters  
-                        GFR = 120,      # Glomerular filtration rate
-                        RBF = 1200,     # Renal blood flow
+                        GFR_base = 120,    # Baseline GFR (mL/min)
+                        RBF_base = 1200,   # Baseline renal blood flow (mL/min)
                         
                         # Immune parameters
-                        TNF_alpha = 10, # TNF-alpha level
-                        IL6 = 5,        # IL-6 level
-                        IL10 = 2        # IL-10 level
+                        TNF_prod = 0.5,    # TNF-alpha production rate
+                        TNF_clear = 0.1,   # TNF-alpha clearance rate
+                        IL6_prod = 0.3,    # IL-6 production rate
+                        IL6_clear = 0.08,  # IL-6 clearance rate
+                        
+                        # Sepsis severity (0-1)
+                        sepsis_severity = 0.5
                     )
-                    
-                    # 모델 함수 정의 (cardio_renal_model로 수정)
-                    cardio_renal_model <- function(time, state, params) {
-                        with(as.list(c(state, params)), {
-                            # Cardiovascular dynamics
-                            dBP <- (HR * SV / TPR) - BP
-                            
-                            # Renal function
-                            dCreatinine <- (0.1 - GFR * Creatinine / 100)
-                            
-                            # Immune response
-                            dCytokine <- TNF_alpha * 0.1 - Cytokine * 0.05
-                            
-                            return(list(c(dBP, dCreatinine, dCytokine)))
-                        })
-                    }
                     
                     # 초기 상태
                     initial_state <- c(
-                        BP = 120,           # Blood pressure
-                        Creatinine = 1.0,   # Serum creatinine
-                        Cytokine = 10       # Cytokine level
+                        MAP = 90,          # Mean arterial pressure (mmHg)
+                        HR = 70,           # Heart rate (bpm)
+                        Creatinine = 1.0,  # Serum creatinine (mg/dL)
+                        TNF = 10,          # TNF-alpha (pg/mL)
+                        IL6 = 5,           # IL-6 (pg/mL)
+                        Fluid = 0          # Fluid balance (L)
                     )
                     
-                    # 시간 벡터
-                    times <- seq(0, 48, by = 0.5)  # 48시간 시뮬레이션
+                    # 시간 벡터 (72시간)
+                    times <- seq(0, 72, by = 1)
                     
                     print("모델 준비 완료!")
-                    print("사용 가능한 변수: params, initial_state, times")
-                    print("모델 함수: cardio_renal_model")
+                    print(paste("파라미터 개수:", length(params)))
+                    print(paste("상태 변수 개수:", length(initial_state)))
+                    print(paste("시뮬레이션 시간: 0 -", max(times), "hours"))
                 `);
                 
                 logToConsole('샘플 모델 로드 완료!', 'info');
@@ -344,11 +310,9 @@
             }
             
             try {
-                logToConsole('모델 로드 시작...', 'info');
+                logToConsole('모델 재로드 중...', 'info');
                 document.getElementById('loadModelBtn').disabled = true;
                 
-                // 실제 모델 파일 로드 시도
-                // 여기서는 샘플 모델을 다시 로드
                 await prepareSampleModel();
                 
                 document.getElementById('loadModelBtn').disabled = false;
@@ -370,29 +334,82 @@
                 logToConsole('시뮬레이션 실행 중...', 'info');
                 document.getElementById('runSimBtn').disabled = true;
                 
-                // ODE 솔버 없이 간단한 시뮬레이션
-                const result = await webR.evalR(`
-                    # 간단한 시뮬레이션 (ODE 솔버 없이)
-                    simulation_results <- data.frame(
-                        time = times,
-                        BP = 120 * exp(-times/20) + 80,
-                        Creatinine = 1.0 + 0.5 * (1 - exp(-times/10)),
-                        Cytokine = 10 * exp(-times/15)
-                    )
+                // 시뮬레이션 실행 (ODE 솔버 없이)
+                await webR.evalR(`
+                    # 간단한 시뮬레이션 로직
+                    n_times <- length(times)
                     
-                    # 결과 요약
-                    print("시뮬레이션 완료!")
+                    # 결과 저장용 행렬
+                    results <- matrix(0, nrow = n_times, ncol = 6)
+                    colnames(results) <- names(initial_state)
+                    
+                    # 초기값 설정
+                    results[1, ] <- initial_state
+                    
+                    # 시뮬레이션 루프
+                    for (i in 2:n_times) {
+                        t <- times[i]
+                        dt <- times[i] - times[i-1]
+                        
+                        # Sepsis progression
+                        sepsis_factor <- 1 + params$sepsis_severity * (1 - exp(-t/24))
+                        
+                        # Cardiovascular response
+                        results[i, "HR"] <- params$HR_base * (1 + 0.3 * sepsis_factor)
+                        results[i, "MAP"] <- 90 - 20 * sepsis_factor + 10 * sin(t/6)
+                        
+                        # Renal function deterioration
+                        results[i, "Creatinine"] <- initial_state["Creatinine"] * 
+                            (1 + params$sepsis_severity * (1 - exp(-t/36)))
+                        
+                        # Cytokine dynamics
+                        results[i, "TNF"] <- initial_state["TNF"] * 
+                            exp(-params$TNF_clear * t) + 
+                            params$TNF_prod * sepsis_factor * 50
+                        
+                        results[i, "IL6"] <- initial_state["IL6"] * 
+                            exp(-params$IL6_clear * t) + 
+                            params$IL6_prod * sepsis_factor * 30
+                        
+                        # Fluid balance
+                        results[i, "Fluid"] <- 2 * sin(t/12) + t * 0.05
+                    }
+                    
+                    # 결과를 데이터프레임으로 변환
+                    simulation_results <- as.data.frame(cbind(time = times, results))
+                    
+                    # 결과 요약 출력
+                    print("========== 시뮬레이션 완료 ==========")
                     print(paste("시뮬레이션 시간:", max(times), "hours"))
-                    print(paste("최종 BP:", round(tail(simulation_results$BP, 1), 2)))
-                    print(paste("최종 Creatinine:", round(tail(simulation_results$Creatinine, 1), 3)))
-                    print(paste("최종 Cytokine:", round(tail(simulation_results$Cytokine, 1), 2)))
-                    
-                    # JSON으로 변환하여 JavaScript로 전달
-                    jsonlite::toJSON(simulation_results)
+                    print("")
+                    print("최종 값:")
+                    print(paste("  MAP:", round(tail(simulation_results$MAP, 1), 1), "mmHg"))
+                    print(paste("  Heart Rate:", round(tail(simulation_results$HR, 1), 0), "bpm"))
+                    print(paste("  Creatinine:", round(tail(simulation_results$Creatinine, 1), 2), "mg/dL"))
+                    print(paste("  TNF-alpha:", round(tail(simulation_results$TNF, 1), 1), "pg/mL"))
+                    print(paste("  IL-6:", round(tail(simulation_results$IL6, 1), 1), "pg/mL"))
+                    print(paste("  Fluid Balance:", round(tail(simulation_results$Fluid, 1), 2), "L"))
+                    print("=====================================")
                 `);
                 
-                // 결과를 JavaScript로 가져오기 (간단한 시각화를 위해)
-                await plotResults();
+                // WebR에서 데이터 가져오기
+                const timeData = await webR.evalR('times');
+                const mapData = await webR.evalR('simulation_results$MAP');
+                const hrData = await webR.evalR('simulation_results$HR');
+                const creatData = await webR.evalR('simulation_results$Creatinine');
+                const tnfData = await webR.evalR('simulation_results$TNF');
+                const il6Data = await webR.evalR('simulation_results$IL6');
+                
+                // JavaScript 배열로 변환
+                const times = await timeData.toArray();
+                const map = await mapData.toArray();
+                const hr = await hrData.toArray();
+                const creatinine = await creatData.toArray();
+                const tnf = await tnfData.toArray();
+                const il6 = await il6Data.toArray();
+                
+                // 플롯 생성
+                await plotResults(times, map, hr, creatinine, tnf, il6);
                 
                 logToConsole('시뮬레이션 완료!', 'info');
                 document.getElementById('runSimBtn').disabled = false;
@@ -404,64 +421,115 @@
         }
         
         // 결과 플로팅
-        async function plotResults() {
+        async function plotResults(times, map, hr, creatinine, tnf, il6) {
             try {
-                // 샘플 데이터로 플롯 생성
-                const times = Array.from({length: 97}, (_, i) => i * 0.5);
-                
+                // Subplot 1: Cardiovascular
                 const trace1 = {
                     x: times,
-                    y: times.map(t => 120 * Math.exp(-t/20) + 80),
+                    y: map,
                     mode: 'lines',
-                    name: 'Blood Pressure (mmHg)',
-                    line: {color: 'red'}
+                    name: 'MAP (mmHg)',
+                    line: {color: 'red', width: 2}
                 };
                 
                 const trace2 = {
                     x: times,
-                    y: times.map(t => 1.0 + 0.5 * (1 - Math.exp(-t/10))),
+                    y: hr,
                     mode: 'lines',
-                    name: 'Creatinine (mg/dL)',
-                    line: {color: 'blue'},
+                    name: 'Heart Rate (bpm)',
+                    line: {color: 'orange', width: 2},
                     yaxis: 'y2'
                 };
                 
+                // Subplot 2: Renal
                 const trace3 = {
                     x: times,
-                    y: times.map(t => 10 * Math.exp(-t/15)),
+                    y: creatinine,
                     mode: 'lines',
-                    name: 'Cytokine Level',
-                    line: {color: 'green'},
+                    name: 'Creatinine (mg/dL)',
+                    line: {color: 'blue', width: 2},
+                    xaxis: 'x2',
                     yaxis: 'y3'
+                };
+                
+                // Subplot 3: Immune
+                const trace4 = {
+                    x: times,
+                    y: tnf,
+                    mode: 'lines',
+                    name: 'TNF-α (pg/mL)',
+                    line: {color: 'green', width: 2},
+                    xaxis: 'x3',
+                    yaxis: 'y4'
+                };
+                
+                const trace5 = {
+                    x: times,
+                    y: il6,
+                    mode: 'lines',
+                    name: 'IL-6 (pg/mL)',
+                    line: {color: 'purple', width: 2},
+                    xaxis: 'x3',
+                    yaxis: 'y5'
                 };
                 
                 const layout = {
                     title: 'Sepsis-AKI Model Simulation Results',
-                    xaxis: {title: 'Time (hours)'},
+                    grid: {rows: 3, columns: 1, pattern: 'independent'},
+                    height: 800,
+                    
+                    xaxis: {
+                        title: 'Time (hours)',
+                        domain: [0, 1]
+                    },
                     yaxis: {
-                        title: 'Blood Pressure (mmHg)',
+                        title: 'MAP (mmHg)',
                         titlefont: {color: 'red'},
-                        tickfont: {color: 'red'}
+                        tickfont: {color: 'red'},
+                        domain: [0.7, 1]
                     },
                     yaxis2: {
-                        title: 'Creatinine (mg/dL)',
-                        titlefont: {color: 'blue'},
-                        tickfont: {color: 'blue'},
+                        title: 'Heart Rate (bpm)',
+                        titlefont: {color: 'orange'},
+                        tickfont: {color: 'orange'},
                         overlaying: 'y',
                         side: 'right'
                     },
+                    
+                    xaxis2: {
+                        title: 'Time (hours)',
+                        domain: [0, 1],
+                        anchor: 'y3'
+                    },
                     yaxis3: {
-                        title: 'Cytokine Level',
+                        title: 'Creatinine (mg/dL)',
+                        titlefont: {color: 'blue'},
+                        tickfont: {color: 'blue'},
+                        domain: [0.35, 0.65]
+                    },
+                    
+                    xaxis3: {
+                        title: 'Time (hours)',
+                        domain: [0, 1],
+                        anchor: 'y4'
+                    },
+                    yaxis4: {
+                        title: 'TNF-α (pg/mL)',
                         titlefont: {color: 'green'},
                         tickfont: {color: 'green'},
-                        overlaying: 'y',
+                        domain: [0, 0.3]
+                    },
+                    yaxis5: {
+                        title: 'IL-6 (pg/mL)',
+                        titlefont: {color: 'purple'},
+                        tickfont: {color: 'purple'},
+                        overlaying: 'y4',
                         side: 'right',
-                        anchor: 'free',
-                        position: 0.85
+                        anchor: 'x3'
                     }
                 };
                 
-                Plotly.newPlot('plotArea', [trace1, trace2, trace3], layout);
+                Plotly.newPlot('plotArea', [trace1, trace2, trace3, trace4, trace5], layout);
                 logToConsole('플롯 생성 완료!', 'info');
                 
             } catch (error) {
