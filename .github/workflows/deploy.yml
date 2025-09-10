@@ -14,13 +14,18 @@ jobs:
         with:
           r-version: '4.3.0'
       
-      - name: Install packages
+      - name: Install system dependencies
         run: |
-          install.packages('rsconnect')
-          install.packages('shiny')
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libssl-dev
+      
+      - name: Install R packages
+        run: |
+          install.packages('rsconnect', repos='https://cloud.r-project.org/')
+          install.packages('shiny', repos='https://cloud.r-project.org/')
         shell: Rscript {0}
       
-      - name: Deploy
+      - name: Deploy to shinyapps.io
         env:
           SHINY_ACC_NAME: ${{ secrets.SHINY_ACC_NAME }}
           TOKEN: ${{ secrets.TOKEN }}
