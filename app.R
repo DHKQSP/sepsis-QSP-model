@@ -62,11 +62,11 @@ server <- function(input, output) {
   })
   
   observeEvent(input$run, {
-    # 모델 실행 코드
-    m1 <- rxode2(ode)
-    theta <- calcNomParams()
-    # ... 시뮬레이션 코드
+    output$plot <- renderPlot({
+      # 간단한 테스트 플롯
+      plot(1:10, main = "테스트 플롯")
+    })
   })
-}
-  
+}  # ← 이거 추가!!!
+
 shinyApp(ui = ui, server = server)
