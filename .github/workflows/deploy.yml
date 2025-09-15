@@ -44,7 +44,6 @@ jobs:
           )
           deployApp(
             appDir = ".",
-            appFiles = c("app.R", "modelfile_0822.R", "calcNomParams_human_0602.R", 
-                         "model_struct.saved", "runmodel.R")
+            forceUpdate = TRUE
           )
         shell: Rscript {0}
