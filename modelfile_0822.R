@@ -1,6 +1,6 @@
 ##############
 #references
-cardio-renal model: K. M. Hallow, Y. Gebremichael, A Quantitative Systems Physiology Model of Renal Function and Blood Pressure Regulation: Application in Salt-Sensitive Hypertension. CPT Pharmacometrics Syst Pharmacol 6, 393-400 (2017).
+#cardio-renal model: K. M. Hallow, Y. Gebremichael, A Quantitative Systems Physiology Model of Renal Function and Blood Pressure Regulation: Application in Salt-Sensitive Hypertension. CPT Pharmacometrics Syst Pharmacol 6, 393-400 (2017).
 host immune response modelL: R. Rao, C. J. Musante, R. Allen, A quantitative systems pharmacology model of the pathophysiology and treatment of COVID-19 predicts optimal timing of pharmacological interventions. NPJ Syst Biol Appl 9, 13 (2023).
 bacterial infection model: J. K. Diep, T. A. Russo, G. G. Rao, Mechanism-Based Disease Progression Model Describing Host-Pathogen Interactions During the Pathogenesis of Acinetobacter baumannii Pneumonia. CPT Pharmacometrics Syst Pharmacol 7, 507-516 (2018).
 
@@ -728,3 +728,4 @@ d/dt(C_arterial_vanco) = (1/V_arterial)*(cardiac_output*60*C_vas_lu_vanco*Blood_
 "
 
 save(ode, file = "model_struct.saved")
+
