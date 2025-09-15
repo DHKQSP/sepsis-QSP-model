@@ -48,7 +48,7 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   # 모델 초기화
-  m1 <- rxode2(model = ode, modname = mod1)
+  m1 <- rxode2(ode)
   theta <- calcNomParams()
   
   # 초기값 설정
@@ -232,3 +232,4 @@ server <- function(input, output) {
 
 # 앱 실행
 shinyApp(ui = ui, server = server)
+
