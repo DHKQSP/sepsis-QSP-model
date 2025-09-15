@@ -50,23 +50,23 @@ ui <- fluidPage(
 # 서버
 server <- function(input, output) {
   
-  # 모델 초기화 - rxode2 방식
-  tryCatch({
-    # modname은 그냥 문자열로 지정
-    m1 <- rxode2(model = ode, modname = "sepsis_model")
-    theta <- calcNomParams()
-    model_initialized <- TRUE
-  }, error = function(e) {
-    print(paste("Model initialization error:", e$message))
-    model_initialized <- FALSE
+  output$status <- renderPrint({
+    tryCatch({
+      # 심플하게 rxode2 호출
+      m1 <- rxode2(ode)
+      theta <- calcNomParams()
+      "모델 초기화 성공!"
+    }, error = function(e) {
+      paste("모델 에러:", e$message)
+    })
   })
   
-  output$status <- renderPrint({
-    if(exists("model_initialized") && model_initialized) {
-      "모델 초기화 성공!"
-    } else {
-      "모델 초기화 실패 - modelfile_0822.R 확인 필요"
-    }
+  observeEvent(input$run, {
+    # 모델 실행 코드
+    m1 <- rxode2(ode)
+    theta <- calcNomParams()
+    # ... 시뮬레이션 코드
   })
+}
   
 shinyApp(ui = ui, server = server)
