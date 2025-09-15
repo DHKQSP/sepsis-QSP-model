@@ -1,3 +1,9 @@
+# model_struct.saved 파일 생성 (없을 경우)
+if(!file.exists("model_struct.saved")) {
+  model_struct <- list()
+  save(model_struct, file = "model_struct.saved")
+}
+
 # app.R - 간단한 테스트 버전
 library(shiny)
 library(rxode2)
