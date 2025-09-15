@@ -39,5 +39,9 @@ jobs:
             token = Sys.getenv("TOKEN"),
             secret = Sys.getenv("SECRET")
           )
-          deployApp(appDir = ".")
+          deployApp(
+            appDir = ".",
+            appFiles = c("app.R", "modelfile_0822.R", "calcNomParams_human_0602.R", 
+                         "model_struct.saved", "runmodel.R")
+          )
         shell: Rscript {0}
