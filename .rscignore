@@ -1,0 +1,6 @@
+*.qmd
+*.Rmd
+README*
+.git*
+.Rproj*
+docs/
