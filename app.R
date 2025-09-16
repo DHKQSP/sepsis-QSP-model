@@ -57,11 +57,9 @@ ui <- fluidPage(
                    style = "width: 100%;"),
       br(), br(),
       
-      # Download button (initially disabled)
-      downloadButton("downloadData", "Download Results (CSV)", 
-                     class = "btn-success",
-                     style = "width: 100%;"),
-      br(), br(),
+      # Download button (조건부 렌더링으로 변경)
+      uiOutput("downloadUI"),
+      br(),
       
       tags$div(style = "background-color: #e8f4f8; padding: 10px; border-radius: 5px;",
           tags$b("Instructions:"),
@@ -108,11 +106,23 @@ server <- function(input, output, session) {
     compiled = FALSE,
     compile_start = NULL,
     last_results = NULL,
-    simulation_params = NULL
+    simulation_params = NULL,
+    simulation_complete = FALSE
   )
   
-  # Initially disable download button
-  shinyjs::disable("downloadData")
+  # Conditional download button rendering
+  output$downloadUI <- renderUI({
+    if(values$simulation_complete) {
+      downloadButton("downloadData", "Download Results (CSV)", 
+                     class = "btn-success",
+                     style = "width: 100%;")
+    } else {
+      tags$button("Download Results (CSV)", 
+                  class = "btn btn-success disabled",
+                  style = "width: 100%; opacity: 0.5; cursor: not-allowed;",
+                  disabled = "disabled")
+    }
+  })
   
   # Status display
   output$status <- renderPrint({
@@ -287,8 +297,8 @@ server <- function(input, output, session) {
           total_dose = input$dose * input$n_doses
         )
         
-        # Enable download button
-        shinyjs::enable("downloadData")
+        # Enable download
+        values$simulation_complete <- TRUE
         
         incProgress(0.9, detail = "Generating plots...")
         
@@ -306,9 +316,9 @@ server <- function(input, output, session) {
           # Target range
           polygon(c(0, input$sim_duration, input$sim_duration, 0),
                   c(10, 10, 20, 20), col = rgb(0, 1, 0, 0.1), border = NA)
-          abline(h = 10, col = "green", lty = 2)  # Min therapeutic
-          abline(h = 20, col = "green", lty = 2)  # Max therapeutic
-          abline(h = 40, col = "red", lty = 2)     # Toxic level
+          abline(h = 10, col = "green", lty = 2)
+          abline(h = 20, col = "green", lty = 2)
+          abline(h = 40, col = "red", lty = 2)
           
           # Dose times
           dose_times <- input$start_time + (0:(input$n_doses-1)) * input$interval
@@ -337,7 +347,6 @@ server <- function(input, output, session) {
                xlim = c(0, input$sim_duration),
                ylim = c(max(1, min(cfu_data)), max(cfu_data) * 10))
           
-          # Add horizontal line for detection limit
           abline(h = 1e2, col = "orange", lty = 2)
           grid()
           
@@ -348,11 +357,10 @@ server <- function(input, output, session) {
                main = "Mean Arterial Pressure",
                xlim = c(0, input$sim_duration))
           
-          # Normal range
           polygon(c(0, input$sim_duration, input$sim_duration, 0),
                   c(65, 65, 110, 110), col = rgb(0, 0, 1, 0.05), border = NA)
-          abline(h = 65, col = "darkblue", lty = 2)  # Hypotension
-          abline(h = 110, col = "darkblue", lty = 2) # Hypertension
+          abline(h = 65, col = "darkblue", lty = 2)
+          abline(h = 110, col = "darkblue", lty = 2)
           grid()
           
           # 4. GFR
@@ -362,10 +370,9 @@ server <- function(input, output, session) {
                main = "Glomerular Filtration Rate",
                xlim = c(0, input$sim_duration))
           
-          # Normal range
-          abline(h = 90, col = "darkgreen", lty = 2)  # Normal lower limit
-          abline(h = 60, col = "orange", lty = 2)     # Stage 2 CKD
-          abline(h = 30, col = "red", lty = 2)        # Stage 4 CKD
+          abline(h = 90, col = "darkgreen", lty = 2)
+          abline(h = 60, col = "orange", lty = 2)
+          abline(h = 30, col = "red", lty = 2)
           
           legend("topright", 
                  legend = c("GFR", "Normal", "Stage 2", "Stage 4"), 
@@ -377,8 +384,6 @@ server <- function(input, output, session) {
         
         # Calculate key metrics
         vanco_data <- x[,"C_venous_vanco"]
-        
-        # Find peaks and troughs
         dose_times <- input$start_time + (0:(input$n_doses-1)) * input$interval
         peaks <- c()
         troughs <- c()
@@ -387,12 +392,10 @@ server <- function(input, output, session) {
           dose_time <- dose_times[i]
           if(i < length(dose_times)) {
             next_dose <- dose_times[i+1]
-            # Peak: max within 2 hours after dose
             peak_window <- which(x[,"time"] >= dose_time & x[,"time"] <= min(dose_time + 2, next_dose))
             if(length(peak_window) > 0) {
               peaks <- c(peaks, max(vanco_data[peak_window]))
             }
-            # Trough: value just before next dose
             trough_time <- which.min(abs(x[,"time"] - (next_dose - 0.5)))
             troughs <- c(troughs, vanco_data[trough_time])
           }
@@ -447,10 +450,8 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       if(!is.null(values$last_results) && !is.null(values$simulation_params)) {
-        # Prepare data
         results_df <- as.data.frame(values$last_results)
         
-        # Add simulation parameters as header
         header_info <- paste0(
           "# Vancomycin Simulation Results\n",
           "# Generated: ", values$simulation_params$timestamp, "\n",
@@ -464,7 +465,6 @@ server <- function(input, output, session) {
           "#\n"
         )
         
-        # Write header and data
         writeLines(header_info, file)
         write.table(results_df, file, append = TRUE, sep = ",", 
                    row.names = FALSE, quote = FALSE)
@@ -472,20 +472,13 @@ server <- function(input, output, session) {
     }
   )
   
-  # Auto update status during compilation
+  # Auto update
   observe({
     if(!is.null(values$compile_start) && !values$compiled) {
       invalidateLater(1000)
     }
   })
 }
-
-# Add shinyjs for enabling/disabling buttons
-library(shinyjs)
-ui <- tagList(
-  useShinyjs(),
-  ui
-)
 
 # Run app
 shinyApp(ui = ui, server = server)
