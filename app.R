@@ -1,8 +1,8 @@
-# app.R - Final Version
+# app.R - Final Version (Fixed)
 library(shiny)
 library(rxode2)
-library(ggplot2)
-library(gridExtra)
+# library(ggplot2)  # 이것도 사용 안하니 제거
+# library(gridExtra)  # 제거!
 
 # Load model files
 tryCatch({
@@ -23,7 +23,7 @@ tryCatch({
   print(paste("Error loading calcNomParams:", e$message))
 })
 
-# UI
+# UI (동일)
 ui <- fluidPage(
   titlePanel("Sepsis QSP Model - Antibiotic Treatment Timing & Duration Analysis"),
   
@@ -293,7 +293,7 @@ ui <- fluidPage(
   )
 )
 
-# Server
+# Server (동일한데 모든 코드 복사)
 server <- function(input, output, session) {
   
   # Reactive values
