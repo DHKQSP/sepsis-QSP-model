@@ -26,7 +26,36 @@ ui <- fluidPage(
   titlePanel("Sepsis QSP Research Model - Antibiotic Treatment Timing & Duration Analysis"),
   
   tags$head(
+    # Mobile viewport meta tag
+    tags$meta(name = "viewport", content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"),
+    
     tags$style(HTML("
+      /* Responsive Design */
+      @media screen and (max-width: 768px) {
+        .sidebar { 
+          width: 100% !important;
+          position: relative !important;
+        }
+        .main { 
+          width: 100% !important;
+          margin-left: 0 !important;
+        }
+        .shiny-input-container { 
+          width: 100% !important;
+        }
+        .btn-block {
+          margin-bottom: 10px !important;
+        }
+        .outcome-metric {
+          margin: 5px 0 !important;
+        }
+        .col-sm-3, .col-sm-4 {
+          width: 100% !important;
+          margin-bottom: 10px !important;
+        }
+      }
+      
+      /* General Styles */
       .status-box { 
         background: #d4edda; 
         border: 1px solid #c3e6cb; 
@@ -34,6 +63,7 @@ ui <- fluidPage(
         padding: 10px; 
         margin-bottom: 20px;
         font-family: monospace;
+        word-wrap: break-word;
       }
       .sofa-box {
         background: #f8f9fa;
@@ -64,6 +94,7 @@ ui <- fluidPage(
         padding: 20px;
         border-radius: 10px;
         margin: 20px 0;
+        word-wrap: break-word;
       }
       .btn-compile {
         background-color: #f39c12;
@@ -77,79 +108,96 @@ ui <- fluidPage(
         background-color: #17a2b8;
         color: white;
       }
+      
+      /* Mobile-specific adjustments */
+      @media screen and (max-width: 480px) {
+        .outcome-value {
+          font-size: 18px;
+        }
+        h4 {
+          font-size: 1.2rem;
+        }
+        .nav-tabs > li {
+          width: 100%;
+        }
+        .nav-tabs > li > a {
+          border-radius: 0;
+        }
+      }
     "))
   ),
   
-  sidebarLayout(
-    sidebarPanel(
-      width = 4,
-      
-      # Model compilation
-      actionButton("compile", "Compile Model", 
-                   class = "btn-compile btn-block", 
-                   style = "width: 100%; margin-bottom: 20px;"),
-      
-      hr(),
-      
-      h4("Treatment Scenarios"),
-      
-      # Treatment Timing - Free adjustment
-      sliderInput("treatment_start", 
-                   "Treatment Start Time (hours):",
-                   min = 0, max = 48, value = 1, step = 0.5,
-                   post = " h"),
-      
-      # Treatment Duration - Free adjustment  
-      sliderInput("treatment_duration", 
-                   "Treatment Duration (days):",
-                   min = 1, max = 30, value = 7, step = 0.5,
-                   post = " days"),
-      
-      # Loading Dose
-      sliderInput("loading_dose_multiplier", 
-                  "Loading Dose Multiplier:",
-                  min = 1.0, max = 2.0, value = 1.5, step = 0.1,
-                  post = "x"),
-      p("(1.0 = no loading dose, 1.5 = standard loading)", style = "font-size: 11px; color: gray;"),
-      
-      # Vancomycin Dosing
-      sliderInput("vanco_dose",
-                  "Vancomycin Dose (mg):",
-                  min = 500, max = 2000, value = 1000, step = 250),
-      
-      selectInput("dose_interval",
-                  "Dosing Interval (hours):",
-                  choices = c(6, 8, 12, 24),
-                  selected = 12),
-      
-      hr(),
-      
-      h4("Simulation Settings"),
-      sliderInput("sim_duration",
-                  "Simulation Duration (hours):",
-                  min = 200, max = 1500, value = 600, step = 100),
-      
-      br(),
-      
-      # Run buttons
-      actionButton("run_single", "Run Single Scenario", 
-                   class = "btn-run btn-block",
-                   style = "width: 100%; margin-bottom: 10px;"),
-      
-      actionButton("run_comparison", "Compare All Durations", 
-                   class = "btn-compare btn-block",
-                   style = "width: 100%; margin-bottom: 10px;"),
-      
-      br(),
-      
-      # Download
-      downloadButton("download_results", "Download Results (CSV)", 
-                     class = "btn-success btn-block",
-                     style = "width: 100%;")
+  fluidRow(
+    column(width = 12, class = "col-lg-4 col-md-5 col-sm-12",
+      wellPanel(
+        h4("Model Controls"),
+        
+        # Model compilation
+        actionButton("compile", "Compile Model", 
+                     class = "btn-compile btn-block", 
+                     style = "width: 100%; margin-bottom: 20px;"),
+        
+        hr(),
+        
+        h4("Treatment Scenarios"),
+        
+        # Treatment Timing - Free adjustment
+        sliderInput("treatment_start", 
+                     "Treatment Start Time (hours):",
+                     min = 0, max = 48, value = 1, step = 0.5,
+                     post = " h"),
+        
+        # Treatment Duration - Free adjustment  
+        sliderInput("treatment_duration", 
+                     "Treatment Duration (days):",
+                     min = 1, max = 30, value = 7, step = 0.5,
+                     post = " days"),
+        
+        # Loading Dose
+        sliderInput("loading_dose_multiplier", 
+                    "Loading Dose Multiplier:",
+                    min = 1.0, max = 2.0, value = 1.5, step = 0.1,
+                    post = "x"),
+        p("(1.0 = no loading dose, 1.5 = standard loading)", style = "font-size: 11px; color: gray;"),
+        
+        # Vancomycin Dosing
+        sliderInput("vanco_dose",
+                    "Vancomycin Dose (mg):",
+                    min = 500, max = 2000, value = 1000, step = 250),
+        
+        selectInput("dose_interval",
+                    "Dosing Interval (hours):",
+                    choices = c(6, 8, 12, 24),
+                    selected = 12),
+        
+        hr(),
+        
+        h4("Simulation Settings"),
+        sliderInput("sim_duration",
+                    "Simulation Duration (hours):",
+                    min = 200, max = 1500, value = 600, step = 100),
+        
+        br(),
+        
+        # Run buttons
+        actionButton("run_single", "Run Single Scenario", 
+                     class = "btn-run btn-block",
+                     style = "width: 100%; margin-bottom: 10px;"),
+        
+        actionButton("run_comparison", "Compare All Durations", 
+                     class = "btn-compare btn-block",
+                     style = "width: 100%; margin-bottom: 10px;"),
+        
+        br(),
+        
+        # Download
+        downloadButton("download_results", "Download Results (CSV)", 
+                       class = "btn-success btn-block",
+                       style = "width: 100%;")
+      )
     ),
     
-    mainPanel(
-      width = 8,
+    column(width = 12, class = "col-lg-8 col-md-7 col-sm-12",
       
       # Status
       wellPanel(
@@ -217,7 +265,7 @@ ui <- fluidPage(
           # Plots
           br(),
           h4("Simulation Results"),
-          plotOutput("single_plots", height = "950px")
+          plotOutput("single_plots", height = "900px")
         ),
         
         # Comparison Tab
